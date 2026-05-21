@@ -19,6 +19,13 @@
         .remove-btn { background: #333; color: #ff4444; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-weight: bold; padding: 5px 12px; transition: 0.2s; }
         .remove-btn:hover { background: #ff4444; color: #fff; }
 
+        .preset-section { background: #1e1e1e; padding: 15px; border-radius: 6px; border: 1px solid #333; margin-top: 15px; }
+        .preset-controls { display: flex; gap: 10px; margin-top: 5px; }
+        .preset-input { flex-grow: 1; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; }
+        .btn-sm { width: auto; padding: 10px 15px; font-size: 13px; font-weight: bold; margin: 0; }
+        .btn-danger { background: #ff4444; color: #fff; }
+        .btn-danger:hover { background: #cc3333; }
+
         .options-row { display: flex; align-items: center; margin: 15px 0; background: #222; padding: 10px; border-radius: 6px; border: 1px solid #333; justify-content: space-between; }
         .checkbox-group { display: flex; align-items: center; }
         .checkbox-group input { margin-right: 10px; transform: scale(1.2); cursor: pointer; }
@@ -61,6 +68,18 @@
         </div>
     </div>
     <button class="btn btn-secondary" onclick="addKeyframe()">+ Add Color Keyframe</button>
+
+    <div class="preset-section">
+        <label style="margin-top: 0;">COLOR PRESETS</label>
+        <select id="preset-select" onchange="loadPreset()">
+            <option value="" disabled selected>Select a preset...</option>
+        </select>
+        <div class="preset-controls">
+            <input type="text" id="preset-name" class="preset-input" placeholder="Custom Preset Name...">
+            <button class="btn btn-sm" onclick="savePreset()">Save Preset</button>
+            <button class="btn btn-sm btn-danger" id="delete-preset-btn" onclick="deletePreset()" style="display:none;">Delete</button>
+        </div>
+    </div>
 
     <label>CHOOSE FONT</label>
     <select id="font-select">
@@ -132,16 +151,21 @@
         return rgbToHex(r, g, b);
     }
 
-    function addKeyframe() {
+    function addKeyframe(colorValue = null) {
         const container = document.getElementById('keyframe-container');
         const div = document.createElement('div');
         div.className = 'keyframe-item';
+        
+        const randomHex = colorValue || `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
+        
         div.innerHTML = `
-            <input type="color" class="color-picker" value="#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}">
+            <input type="color" class="color-picker" value="${randomHex}">
             <button class="remove-btn" onclick="removeKeyframe(this)">×</button>
         `;
         container.appendChild(div);
         div.querySelector('input').addEventListener('input', generate);
+        
+        updateRemoveButtonsVisibility();
         generate();
     }
 
@@ -149,6 +173,104 @@
         const items = document.querySelectorAll('.keyframe-item');
         if (items.length > 2) {
             btn.parentElement.remove();
+            updateRemoveButtonsVisibility();
+            generate();
+        }
+    }
+
+    function updateRemoveButtonsVisibility() {
+        const items = document.querySelectorAll('.keyframe-item');
+        items.forEach((item, index) => {
+            const btn = item.querySelector('.remove-btn');
+            btn.style.visibility = (index === 0) ? 'hidden' : 'visible';
+        });
+    }
+
+    function initPresets() {
+        const select = document.getElementById('preset-select');
+        select.innerHTML = '<option value="" disabled selected>Select a preset...</option>';
+
+        const userPresets = JSON.parse(localStorage.getItem('gradient_presets')) || {};
+        if (Object.keys(userPresets).length > 0) {
+            const userGroup = document.createElement('optgroup');
+            userGroup.label = "My Saved Presets";
+            for (const name in userPresets) {
+                let opt = document.createElement('option');
+                opt.value = name;
+                opt.innerText = name;
+                userGroup.appendChild(opt);
+            }
+            select.appendChild(userGroup);
+        }
+        
+        document.getElementById('delete-preset-btn').style.display = 'none';
+    }
+
+    function savePreset() {
+        const nameInput = document.getElementById('preset-name');
+        const name = nameInput.value.trim();
+        
+        if (!name) {
+            alert('Please enter a valid preset name.');
+            return;
+        }
+
+        const colorPickers = document.querySelectorAll('.color-picker');
+        const colors = Array.from(colorPickers).map(p => p.value);
+
+        let userPresets = JSON.parse(localStorage.getItem('gradient_presets')) || {};
+        userPresets[name] = colors;
+        
+        localStorage.setItem('gradient_presets', JSON.stringify(userPresets));
+        nameInput.value = '';
+        
+        initPresets();
+        
+        document.getElementById('preset-select').value = name;
+        document.getElementById('delete-preset-btn').style.display = 'inline-block';
+    }
+
+    function loadPreset() {
+        const select = document.getElementById('preset-select');
+        const name = select.value;
+        if (!name) return;
+
+        const userPresets = JSON.parse(localStorage.getItem('gradient_presets')) || {};
+        const colors = userPresets[name];
+        document.getElementById('delete-preset-btn').style.display = 'inline-block';
+
+        if (!colors || colors.length === 0) return;
+
+        const container = document.getElementById('keyframe-container');
+        container.innerHTML = '';
+
+        colors.forEach((color) => {
+            const div = document.createElement('div');
+            div.className = 'keyframe-item';
+            div.innerHTML = `
+                <input type="color" class="color-picker" value="${color}">
+                <button class="remove-btn" onclick="removeKeyframe(this)">×</button>
+            `;
+            container.appendChild(div);
+            div.querySelector('input').addEventListener('input', generate);
+        });
+
+        updateRemoveButtonsVisibility();
+        
+        document.querySelectorAll('.color-picker').forEach(p => p.addEventListener('input', generate));
+        generate();
+    }
+
+    function deletePreset() {
+        const select = document.getElementById('preset-select');
+        const name = select.value;
+        if (!name) return;
+
+        if (confirm(`Are you sure you want to delete preset "${name}"?`)) {
+            let userPresets = JSON.parse(localStorage.getItem('gradient_presets')) || {};
+            delete userPresets[name];
+            localStorage.setItem('gradient_presets', JSON.stringify(userPresets));
+            initPresets();
             generate();
         }
     }
@@ -236,6 +358,7 @@
     fontDropdown.addEventListener('change', generate);
     document.querySelectorAll('.color-picker').forEach(p => p.addEventListener('input', generate));
 
+    initPresets();
     generate();
 </script>
 
