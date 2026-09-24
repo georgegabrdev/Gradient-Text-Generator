@@ -91,6 +91,7 @@
         <option value="combined">Combined: (#color / [#dark / t])</option>
         <option value="text-only">Text Color Only: (#color / t)</option>
         <option value="outline-only">Outline Color: [#color / t]</option>
+        <option value="rich-text">Rich Text: &lt;font color="#hex"&gt;t&lt;/font&gt;</option>
     </select>
 
     <div class="options-row">
@@ -325,12 +326,19 @@
             } else if (selectedMode === "combined") {
                 codeResult += `(${hex}${slash}[${darkHex}${slash}${text[i]}])`;
                 charStyle = `color: ${hex}; text-shadow: 2px 2px 0px ${darkHex};`;
+            } else if (selectedMode === "rich-text") {
+                codeResult += `<font color="${hex}">${text[i]}</font>`;
+                charStyle = `color: ${hex};`;
             }
             visualHTML += `<span style="${charStyle}">${text[i]}</span>`;
         }
 
         if (selectedFont !== "") {
-            codeResult = `<${selectedFont}${slash}${codeResult}>`;
+            if (selectedMode === "rich-text") {
+                codeResult = `<font face="${selectedFont}">${codeResult}</font>`;
+            } else {
+                codeResult = `<${selectedFont}${slash}${codeResult}>`;
+            }
         }
 
         preview.innerText = codeResult;
